@@ -39,16 +39,19 @@ class ProjectionGridDescriptor(MeshDescriptor):
         lat-lon projection used to transform from x-y to lat-lon space
 
     x : numpy.ndarray
-        The latitude coordinate at grid-cell centers
+        The x coordinate (m) at grid-cell centers
 
     y : numpy.ndarray
-        The longitude coordinate at grid-cell centers
+        The y coordinate (m) at grid-cell centers
+
+    area : numpy.ndarray
+        The area (radians^2) of each grid cell
 
     xCorner : numpy.ndarray
-        The latitude coordinate at grid-cell corners
+        The x coordinate at grid-cell corners
 
     yCorner : numpy.ndarray
-        The longitude coordinate at grid-cell corners
+        The y coordinate at grid-cell corners
 
     history : str
         The history attribute written to SCRIP files
@@ -82,6 +85,7 @@ class ProjectionGridDescriptor(MeshDescriptor):
 
         self.x = None
         self.y = None
+        self.area = None
         self.xCorner = None
         self.yCorner = None
         self.history = None
@@ -111,8 +115,11 @@ class ProjectionGridDescriptor(MeshDescriptor):
             provided, the data set in ``fileName`` must have a global
             attribute ``meshName`` that will be used instead.
 
-        xVarName, yVarName : str, optional
-            The name of the x and y (in meters) variables in the grid file
+        xVarName : str, optional
+            The name of the x variable (units must be meters) in the grid file
+
+        yVarName : str, optional
+            The name of the y variable (units must be meters) in the grid file
         """
         ds = xarray.open_dataset(fileName)
 
@@ -151,15 +158,12 @@ class ProjectionGridDescriptor(MeshDescriptor):
             longitude
 
         x : numpy.ndarray
-            One dimensional array defining the x coordinate of grid cell
-            centers.
+            One dimensional array defining the x coordinate (m) of grid cell
+            centers
 
         y : numpy.ndarray
-            One dimensional array defining the y coordinate of grid cell
-            centers.
-
-        meshName : str
-            The name of the grid (e.g. ``'10km_Antarctic_stereo'``)
+            One dimensional array defining the y coordinate (m) of grid cell
+            centers
         """
         descriptor = cls(projection, meshName=meshName)
 
@@ -173,6 +177,21 @@ class ProjectionGridDescriptor(MeshDescriptor):
         descriptor.yCorner = interp_extrap_corner(descriptor.y)
         descriptor.history = add_history()
         return descriptor
+
+    def compute_area_from_xy(self, sphereRadius):
+        """
+        Compute the area of each grid cell based on the x and y coordinates
+
+        Parameters
+        ----------
+        sphereRadius : float
+            The radius of the sphere in m, used to convert from m to radians
+        """
+        dx = numpy.abs(self.xCorner[1:] - self.xCorner[:-1])
+        dy = numpy.abs(self.yCorner[1:] - self.yCorner[:-1])
+        dx, dy = numpy.meshgrid(dx, dy)
+        area = dx * dy
+        self.area = area / sphereRadius**2
 
     def to_scrip(self, scripFileName, expandDist=None, expandFactor=None):
         """
@@ -200,6 +219,13 @@ class ProjectionGridDescriptor(MeshDescriptor):
 
         create_scrip(outFile, grid_size=grid_size, grid_corners=4,
                      grid_rank=2, units='degrees', meshName=self.meshName)
+
+        if self.area is not None:
+            grid_area = outFile.createVariable('grid_area', 'f8',
+                                               ('grid_size',))
+            # SCRIP uses square radians
+            grid_area.units = 'radian^2'
+            grid_area[:] = self.area.flat
 
         (X, Y) = numpy.meshgrid(self.x, self.y)
         (XCorner, YCorner) = numpy.meshgrid(self.xCorner, self.yCorner)
