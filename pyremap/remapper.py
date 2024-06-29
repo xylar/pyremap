@@ -308,7 +308,8 @@ class Remapper(object):
 
     def remap_file(self, inFileName, outFileName,  # noqa: C901
                    variableList=None, overwrite=False, renormalize=None,
-                   logger=None, replaceMpasFill=False, parallel_exec=None):
+                   logger=None, replaceMpasFill=False, parallel_exec=None,
+                   mpas_model='mpaso'):
         """
         Given a source file defining either an MPAS mesh or a lat-lon grid and
         a destination file or set of arrays defining a lat-lon grid, constructs
@@ -346,6 +347,10 @@ class Remapper(object):
         parallel_exec : {'srun'}, optional
             The name of the parallel executable to use to launch ncremap.
             By default, none is used.
+
+        mpas_model : {'mpaso', 'mpassi', 'mali'}, optional
+            The MPAS model to provide as the ``-P`` argument to ncremap for
+            MPAS source or destination meshes
 
         Raises
         ------
@@ -396,7 +401,7 @@ class Remapper(object):
         if isinstance(self.sourceDescriptor, (MpasCellMeshDescriptor,
                                               MpasEdgeMeshDescriptor,
                                               MpasVertexMeshDescriptor)):
-            args.extend(['-P', 'mpas'])
+            args.extend(['-P', mpas_model])
             if not replaceMpasFill:
                 # the -C (climatology) flag prevents ncremap from trying to
                 # add a _FillValue attribute that might already be present
