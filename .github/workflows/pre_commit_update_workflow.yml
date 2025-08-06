@@ -19,6 +19,9 @@ env:
 
 jobs:
   auto-update:
+    permissions:
+      contents: write
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,8 +42,7 @@ jobs:
         run: |
           eval "$(micromamba shell hook --shell bash)"
           micromamba activate pre_commit_dev
-          # permissions issue with gh 2.76.0
-          conda install -y pre-commit "gh !=2.76.0"
+          conda install -y pre-commit gh
           gh --version
 
       - name: Apply and commit updates
